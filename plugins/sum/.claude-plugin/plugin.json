@@ -1,0 +1,11 @@
+{
+  "name": "sum",
+  "displayName": "Summation",
+  "version": "0.1.0",
+  "description": "Summation over the public sum-api: live OpenAPI discovery, data questions, report generation and export (PDF/DOCX/Markdown).",
+  "author": {
+    "name": "Summation"
+  },
+  "homepage": "https://summation.com",
+  "keywords": ["data", "analytics", "reports", "sum-api"]
+}
