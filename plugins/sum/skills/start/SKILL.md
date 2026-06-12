@@ -42,9 +42,16 @@ Run `preflight`. Two checks, in order — **both must pass before steps 3–4**:
 
 **Both gates pass** → update the visual with the **source map** panel: connected systems (one-line summaries from connections, including dataset counts), tables/views/projects counts, notable table names — all mirrored from preflight output verbatim.
 
-### Step 3 — Meet Addison
+### Step 3 — Meet Addison (pre-gate: the project must see data)
 
-Addison is Summation's analyst agent. Ensure a project: list projects; if none, propose creating one named `getting-started` and create it only after the user agrees. Then open a conversation:
+Addison's data context is **project-scoped**: tenant-level datasets are invisible to Addison until attached to the project as catalog entries. Sequence:
+
+1. Ensure a project: list projects; if none, propose creating one named `getting-started` and create it only after the user agrees.
+2. **Check the project's catalog**: `call GET /v1/projects/<PID>/catalog-entries`. If empty, attach data in-flow (this rung has a public API):
+   - Show candidate tables from the attached datasets (`call GET /v1/tables` — business tables, never system/grid tables) and ask which to start with (suggest 3–10; more can be attached anytime).
+   - Attach each pick: `call POST /v1/projects/<PID>/catalog-entries --body '{"source_type": "table", "source_id": "<tbl-...>"}'`.
+   - Confirm the catalog now lists them. Only then continue.
+3. Open the conversation:
 
 ```bash
 python3 ../api/scripts/sum_api.py call --stream \
@@ -61,6 +68,7 @@ Update the visual: numbered report-idea cards (title + one-line what-you'll-lear
 ## Rules
 
 - **`datasets_total` is the source of truth for "data is analyzable" — never table counts, never browsable sources.** Every tenant carries internal/grid system tables (table counts prove nothing), and a connection's reachable databases are merely attachable (browse output proves nothing). Never assume, invent, or embellish data; the source map mirrors `preflight` output exactly.
+- **The full truth ladder: credentials → connection → attached datasets → project catalog entries → analyzable by Addison.** Each rung has its own gate; clearing one never implies the next.
 - Visual first, then work; one visual updated through the flow, not four separate ones.
 - Never **ask** for database passwords or connection secrets in chat. The `connect` skill owns secret transit (local-file handoff preferred; pasted-secret salvage with rotation advice as fallback; webapp always offered).
 - Each step's failure has a graceful path; never show a stack trace — surface the `request_id` and continue where possible.
