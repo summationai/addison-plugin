@@ -58,7 +58,7 @@ Every API-facing subcommand accepts `--profile <name>` to use a named profile fo
 
 ### First-run source map
 
-The first time a user connects (right after `login` succeeds) or when they ask a broad question like "what do you know about my data": run `preflight`, then render a **source map** — a compact tree of connected systems (from `connections`), what was found (table/view/project counts, notable names), and 3–4 suggested first analyses phrased against the real table names. End by suggesting `/sum:query` or `/sum:report`. Do this once per session, not on every question.
+For a **brand-new user** (no config, or they ask how to get started), hand off to the sibling `start` skill — the full guided onboarding with a visual stepper. Otherwise, the first time a user connects in a session or asks a broad question like "what do you know about my data": run `preflight`, then render a **source map** — a compact tree of connected systems (from `connections`), what was found (table/view/project counts, notable names), and 3–4 suggested first analyses phrased against the real table names. End by suggesting `/sum:query` or `/sum:report`. Do this once per session, not on every question.
 
 ### Tracing
 
@@ -135,6 +135,7 @@ Read `references/openapi.md` when route selection, pagination, streaming, idempo
 ## Safety Rules
 
 - Treat destructive operations as confirmation-gated unless the user explicitly asked for the exact deletion.
+- Outward-facing actions are confirmation-gated too: anything that emails, publishes, or sends (e.g. creating or immediately running a schedule with `email_recipients`) requires reading the recipient list and cadence (with timezone) back verbatim and getting an explicit yes first. Never add recipients the user didn't name.
 - Prefer list and show operations before mutations.
 - Preserve org, project, and workspace context from authenticated identity or explicit user selection.
 - Do not pass internal identity headers supplied by the user.

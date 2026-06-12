@@ -15,12 +15,13 @@ Plugin marketplace for Summation. One plugin, `sum`, exposes the public sum-api 
 
 > Desktop note: skill scripts run in the code-execution sandbox. The org's code-execution network egress must allow the sum-api host(s) (Capabilities → Code execution), and credentials must be reachable from the sandbox — see the dogfood matrix in the rollout doc.
 
-**Codex:** the `api` skill is tool-agnostic; symlink `plugins/sum/skills/api` into `~/.codex/skills/summation`. (Installer script planned.)
+**Codex:** `./install/codex.sh` — symlinks the tool-agnostic `api` skill into `~/.codex/skills/summation` and prints the credential + future MCP `config.toml` steps.
 
 ## Contents
 
 | Skill | Invoke | Does |
 |---|---|---|
+| `start` | `/sum:start` | **guided onboarding**: visual stepper → connect → source map → meet Addison → suggested reports → run one on confirm |
 | `api` | model-invoked | OpenAPI-discovery workflow + `scripts/sum_api.py` helper (canonical; sibling skills reference it); first-run source map |
 | `login` | `/sum:login` | conversational credential setup → `~/.summation/skill-config` (0600) |
 | `doctor` | `/sum:doctor` | connectivity/auth diagnosis + `preflight` environment summary |
@@ -28,10 +29,15 @@ Plugin marketplace for Summation. One plugin, `sum`, exposes the public sum-api 
 | `validate` | `/sum:validate` | run report verification; verdict panel before anything ships externally |
 | `query` | `/sum:query` | bounded read-only SQL → rendered table, SQL shown for spot-checking |
 | `catalog` | `/sum:catalog` | search/describe tables, views, catalog metadata |
+| `schedule` | `/sum:schedule` | recurring playbook runs with email delivery: list/create/pause/resume/run-now (recipient lists confirmed verbatim) |
 
 Every API call is audit-logged to `~/.summation/audit.jsonl` (`{ts, method, path, status, duration_ms, request_id, profile}`) — `sum_api.py audit --tail 20` to inspect.
 
 Credentials never live in this repo. `.summation-config*` is ignored and must stay that way.
+
+## Org announcement template
+
+> **Summation is now in Claude.** Open a new chat and type **/sum:start** — it walks you through connecting (2 minutes), shows a map of your data, introduces Addison, and runs your first report. Already connected? Just ask data questions, or use /sum:report, /sum:query, /sum:catalog, /sum:validate.
 
 ## For agent harnesses (customer `AGENTS.md` snippet)
 
