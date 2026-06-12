@@ -1,7 +1,7 @@
 ---
 name: catalog
 description: Search and describe Summation tables, views, and catalog metadata. Use when the user asks what data exists, wants schemas or column details, or before writing any SQL.
-argument-hint: [search term]
+argument-hint: "[search term]"
 ---
 
 # Summation Catalog

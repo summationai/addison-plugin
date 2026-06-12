@@ -29,6 +29,15 @@ python3 ../api/scripts/sum_api.py call GET /v1/projects
 
 4. Report: config path, active profile, and whether the authenticated list call succeeded (include `request_id` on failure).
 
+## No credentials yet? (new-customer path)
+
+If the user has no `client_id`/`client_secret` and no idea where to get them, do NOT dead-end. Explain: API credentials are issued by their Summation admin (or Summation support), then offer to draft the request for them:
+
+> Subject: Summation API credentials for Claude
+> Hi — I'm connecting Claude to Summation and need machine credentials: the API **base URL** for our tenant, a **client_id** and **client_secret** with scopes `agent:read agent:write`. Please share them securely (not over chat/email plaintext).
+
+Tell them to come back with `/sum:login` once they have the three values — and that the values are stored locally with file mode 0600, never in this conversation's history beyond their one paste.
+
 ## Rules
 
 - Never print, log, or commit the client secret. It appears once, in the user's message; do not repeat it.
