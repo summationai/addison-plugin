@@ -840,14 +840,14 @@ def command_login_poll(args: argparse.Namespace) -> None:
             time.sleep(min(args.interval, remaining))
             continue
 
-        if status == "complete":
+        if status == "approved":
             credential = response.get("credential")
             if not isinstance(credential, str) or not credential:
-                raise SystemExit("Device-login poll failed: complete response missing credential")
+                raise SystemExit("Device-login poll failed: approved response missing credential")
             profile_name = args.profile or selected_profile_name()
             path = store_device_login_credential(credential, profile_name)
             print(json_dumps({
-                "status": "complete",
+                "status": "approved",
                 "config_file": str(path),
                 "config_file_mode": config_file_mode(path),
                 "profile": profile_name,
