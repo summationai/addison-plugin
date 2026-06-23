@@ -20,6 +20,7 @@ ACTIVE_PROFILE_KEY = "SUM_API_ACTIVE_PROFILE"
 PROFILE_ENV_KEYS = ("SUM_API_PROFILE", "SUMMATION_PROFILE")
 CONFIG_PATH_ENV_KEYS = ("SUM_API_CONFIG_FILE", "SUMMATION_CONFIG")
 PROFILE_SECTION_PREFIX = "profile."
+DEVICE_LOGIN_CREDENTIAL_KEY = "SUM_API_DEVICE_LOGIN_CREDENTIAL"
 PROFILE_OVERRIDE: str | None = None
 
 
@@ -198,6 +199,55 @@ def base_url() -> str:
     return setting("SUM_API_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
 
 
+def normalize_device_login_credential(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if not normalized.startswith("sm_dls_"):
+        raise SystemExit(
+            f"{DEVICE_LOGIN_CREDENTIAL_KEY} must start with 'sm_dls_'"
+        )
+    return normalized
+
+
+def device_login_credential() -> str | None:
+    return normalize_device_login_credential(setting(DEVICE_LOGIN_CREDENTIAL_KEY))
+
+
+def auth_mode(
+    *,
+    values: dict[str, str] | None = None,
+    selected_values: dict[str, str] | None = None,
+) -> str | None:
+    if values is None:
+        if device_login_credential():
+            return "device_login"
+        if setting("SUM_API_ACCESS_TOKEN"):
+            return "access_token"
+        if setting("SUM_API_CLIENT_ID") and setting("SUM_API_CLIENT_SECRET"):
+            return "m2m"
+        return None
+
+    def value_for(key: str) -> str | None:
+        if key in values:
+            value = values.get(key)
+            return value if value else None
+        if selected_values and key in selected_values:
+            value = selected_values.get(key)
+            return value if value else None
+        return None
+
+    if normalize_device_login_credential(value_for(DEVICE_LOGIN_CREDENTIAL_KEY)):
+        return "device_login"
+    if value_for("SUM_API_ACCESS_TOKEN"):
+        return "access_token"
+    if value_for("SUM_API_CLIENT_ID") and value_for("SUM_API_CLIENT_SECRET"):
+        return "m2m"
+    return None
+
+
 def json_dumps(value: Any) -> str:
     return json.dumps(value, indent=2, sort_keys=True)
 
@@ -373,9 +423,11 @@ def exchange_m2m_token() -> str:
 
 
 def auth_headers(required: bool = True) -> dict[str, str]:
-    token = setting("SUM_API_ACCESS_TOKEN")
+    token = device_login_credential()
     if not token:
-        token = exchange_m2m_token() if required else None
+        token = setting("SUM_API_ACCESS_TOKEN")
+    if not token and required:
+        token = exchange_m2m_token()
     if not token:
         return {}
     return {"Authorization": f"Bearer {token}"}
@@ -669,7 +721,7 @@ def prompt_if_needed(label: str, current: str | None, *, secret: bool = False) -
 def redacted_values(values: dict[str, str]) -> dict[str, str]:
     redacted = {}
     for key, value in values.items():
-        if "SECRET" in key or "TOKEN" in key:
+        if "SECRET" in key or "TOKEN" in key or "CREDENTIAL" in key:
             redacted[key] = "[redacted]" if value else ""
         else:
             redacted[key] = value
@@ -771,6 +823,8 @@ def command_doctor(_: argparse.Namespace) -> None:
         "openapi_title": spec.get("info", {}).get("title"),
         "openapi_version": spec.get("info", {}).get("version"),
         "path_count": len(spec.get("paths", {})),
+        "preferred_auth_mode": auth_mode(),
+        "has_device_login_credential": bool(device_login_credential()),
         "has_access_token": bool(setting("SUM_API_ACCESS_TOKEN")),
         "has_m2m_credentials": bool(setting("SUM_API_CLIENT_ID") and setting("SUM_API_CLIENT_SECRET")),
     }
@@ -779,17 +833,44 @@ def command_doctor(_: argparse.Namespace) -> None:
 
 def command_profiles(_: argparse.Namespace) -> None:
     profiles = config_profiles()
+    root_values = config_values()
+    selected_values = selected_profile_values()
     print(json_dumps({
         "active_profile": selected_profile_name(),
+        "preferred_auth_mode": auth_mode(),
         "config_file": str(active_config_path()) if active_config_path() else None,
         "profiles": [
             {
                 "name": name,
                 "active": name == selected_profile_name(),
+                "auth_mode": auth_mode(values=values),
+                "has_device_login_credential": bool(
+                    normalize_device_login_credential(values.get(DEVICE_LOGIN_CREDENTIAL_KEY))
+                ),
+                "has_access_token": bool(values.get("SUM_API_ACCESS_TOKEN")),
+                "has_m2m_credentials": bool(
+                    values.get("SUM_API_CLIENT_ID") and values.get("SUM_API_CLIENT_SECRET")
+                ),
                 "settings": redacted_values(values),
             }
             for name, values in sorted(profiles.items())
         ],
+        "selected_profile_settings": {
+            "auth_mode": auth_mode(values=selected_values, selected_values=root_values),
+            "has_device_login_credential": bool(
+                normalize_device_login_credential(
+                    selected_values.get(DEVICE_LOGIN_CREDENTIAL_KEY)
+                    or root_values.get(DEVICE_LOGIN_CREDENTIAL_KEY)
+                )
+            ),
+            "has_access_token": bool(
+                selected_values.get("SUM_API_ACCESS_TOKEN") or root_values.get("SUM_API_ACCESS_TOKEN")
+            ),
+            "has_m2m_credentials": bool(
+                (selected_values.get("SUM_API_CLIENT_ID") or root_values.get("SUM_API_CLIENT_ID"))
+                and (selected_values.get("SUM_API_CLIENT_SECRET") or root_values.get("SUM_API_CLIENT_SECRET"))
+            ),
+        },
         "legacy_settings": redacted_values(config_values()),
     }))
 
