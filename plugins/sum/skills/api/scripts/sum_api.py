@@ -578,6 +578,32 @@ def store_device_login_credential(credential: str, profile_name: str | None) -> 
     return path
 
 
+def clear_device_login_credential(profile_name: str | None) -> tuple[pathlib.Path, bool]:
+    path = active_config_path() or home_config_path()
+    file_config = read_config_from_path(path)
+    root_values = dict(file_config.get("values", {}))
+    profiles = {
+        name: dict(profile)
+        for name, profile in file_config.get("profiles", {}).items()
+    }
+
+    removed = False
+    if profile_name:
+        target = dict(profiles.get(profile_name, {}))
+        if DEVICE_LOGIN_CREDENTIAL_KEY in target:
+            removed = True
+            del target[DEVICE_LOGIN_CREDENTIAL_KEY]
+        if profile_name in profiles:
+            profiles[profile_name] = target
+    else:
+        if DEVICE_LOGIN_CREDENTIAL_KEY in root_values:
+            removed = True
+            del root_values[DEVICE_LOGIN_CREDENTIAL_KEY]
+
+    write_config_file(path, root_values, profiles)
+    return path, removed
+
+
 def iter_operations(spec: dict[str, Any]):
     for path, path_item in spec.get("paths", {}).items():
         if not isinstance(path_item, dict):
@@ -832,7 +858,18 @@ def command_login_poll(args: argparse.Namespace) -> None:
             print(json_dumps({"status": status}))
             return
 
-        raise SystemExit(f"Device-login poll failed: unexpected status '{response['status']}'")
+    raise SystemExit(f"Device-login poll failed: unexpected status '{response['status']}'")
+
+
+def command_logout(args: argparse.Namespace) -> None:
+    profile_name = args.profile or selected_profile_name()
+    path, removed = clear_device_login_credential(profile_name)
+    print(json_dumps({
+        "status": "logged_out" if removed else "already_logged_out",
+        "config_file": str(path),
+        "config_file_mode": config_file_mode(path),
+        "profile": profile_name,
+    }))
 
 
 def config_file_mode(path: pathlib.Path) -> str | None:
@@ -1234,6 +1271,13 @@ def main() -> int:
         help="Expiration window in seconds returned by the login command",
     )
     login_poll_parser.set_defaults(func=command_login_poll)
+
+    logout_parser = subparsers.add_parser(
+        "logout",
+        help="Remove the stored device-login credential from the selected profile",
+    )
+    add_profile_argument(logout_parser)
+    logout_parser.set_defaults(func=command_logout)
 
     configure_parser = subparsers.add_parser("configure", help="Write a local Summation config file")
     configure_parser.add_argument("--profile", help="Profile name to create or update")
