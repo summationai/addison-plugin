@@ -21,6 +21,10 @@ PROFILE_ENV_KEYS = ("SUM_API_PROFILE", "SUMMATION_PROFILE")
 CONFIG_PATH_ENV_KEYS = ("SUM_API_CONFIG_FILE", "SUMMATION_CONFIG")
 PROFILE_SECTION_PREFIX = "profile."
 DEVICE_LOGIN_CREDENTIAL_KEY = "SUM_API_DEVICE_LOGIN_CREDENTIAL"
+DEVICE_LOGIN_ALLOWED_SURFACES = (
+    "claude-code",
+    "claude-desktop",
+)
 PROFILE_OVERRIDE: str | None = None
 
 
@@ -510,6 +514,25 @@ def request_stream(
         raise SystemExit(format_url_error(exc)) from exc
 
 
+def _expect_device_login_start_response(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise SystemExit("Device-login start failed: expected a JSON object response")
+    required = (
+        "device_code",
+        "user_code",
+        "verification_uri",
+        "verification_uri_complete",
+        "expires_in",
+    )
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise SystemExit(
+            "Device-login start failed: missing response fields "
+            + ", ".join(missing)
+        )
+    return payload
+
+
 def iter_operations(spec: dict[str, Any]):
     for path, path_item in spec.get("paths", {}).items():
         if not isinstance(path_item, dict):
@@ -701,6 +724,25 @@ def command_schema(args: argparse.Namespace) -> None:
 
 def command_token(_: argparse.Namespace) -> None:
     print(json_dumps({"access_token": exchange_m2m_token()}))
+
+
+def command_login(args: argparse.Namespace) -> None:
+    response = _expect_device_login_start_response(
+        request_json(
+            "POST",
+            "/v1/auth/device-logins",
+            body={"surface": args.surface},
+        )
+    )
+    result = {
+        "surface": args.surface,
+        "verification_uri": response["verification_uri"],
+        "verification_uri_complete": response["verification_uri_complete"],
+        "user_code": response["user_code"],
+        "expires_in": response["expires_in"],
+        "interval": response.get("interval", 5),
+    }
+    print(json_dumps(result))
 
 
 def config_file_mode(path: pathlib.Path) -> str | None:
@@ -1065,6 +1107,19 @@ def main() -> int:
     token_parser = subparsers.add_parser("token", help="Exchange M2M credentials for an access token")
     add_profile_argument(token_parser)
     token_parser.set_defaults(func=command_token)
+
+    login_parser = subparsers.add_parser(
+        "login",
+        help="Start device login and print the browser approval instructions",
+    )
+    add_profile_argument(login_parser)
+    login_parser.add_argument(
+        "--surface",
+        default="claude-code",
+        choices=DEVICE_LOGIN_ALLOWED_SURFACES,
+        help="Client surface identifier for the device-login request",
+    )
+    login_parser.set_defaults(func=command_login)
 
     configure_parser = subparsers.add_parser("configure", help="Write a local Summation config file")
     configure_parser.add_argument("--profile", help="Profile name to create or update")
