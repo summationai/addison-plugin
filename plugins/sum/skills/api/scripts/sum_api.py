@@ -533,6 +533,51 @@ def _expect_device_login_start_response(payload: Any) -> dict[str, Any]:
     return payload
 
 
+def _poll_device_login(device_code: str) -> dict[str, Any]:
+    response = request_json(
+        "POST",
+        "/v1/auth/device-logins/tokens",
+        body={"device_code": device_code},
+    )
+    if "status" not in response:
+        raise SystemExit("Device-login poll failed: missing response field status")
+    return response
+
+
+def _normalize_poll_interval(value: Any) -> int:
+    if not isinstance(value, int) or value <= 0:
+        return 5
+    return value
+
+
+def store_device_login_credential(credential: str, profile_name: str | None) -> pathlib.Path:
+    normalized = normalize_device_login_credential(credential)
+    if not normalized:
+        raise SystemExit("Device-login poll failed: credential was empty")
+    path = active_config_path() or home_config_path()
+    file_config = read_config_from_path(path)
+    root_values = dict(file_config.get("values", {}))
+    profiles = {
+        name: dict(profile)
+        for name, profile in file_config.get("profiles", {}).items()
+    }
+
+    if profile_name:
+        target = dict(profiles.get(profile_name, {}))
+        if not target.get("SUM_API_BASE_URL"):
+            target["SUM_API_BASE_URL"] = base_url()
+        target[DEVICE_LOGIN_CREDENTIAL_KEY] = normalized
+        profiles[profile_name] = target
+        if not root_values.get(ACTIVE_PROFILE_KEY):
+            root_values[ACTIVE_PROFILE_KEY] = profile_name
+    else:
+        root_values.setdefault("SUM_API_BASE_URL", base_url())
+        root_values[DEVICE_LOGIN_CREDENTIAL_KEY] = normalized
+
+    write_config_file(path, root_values, profiles)
+    return path
+
+
 def iter_operations(spec: dict[str, Any]):
     for path, path_item in spec.get("paths", {}).items():
         if not isinstance(path_item, dict):
@@ -734,15 +779,60 @@ def command_login(args: argparse.Namespace) -> None:
             body={"surface": args.surface},
         )
     )
+    expires_in = response["expires_in"]
+    if not isinstance(expires_in, int) or expires_in <= 0:
+        raise SystemExit("Device-login start failed: expires_in must be a positive integer")
+    interval = _normalize_poll_interval(response.get("interval"))
     result = {
+        "device_code": response["device_code"],
         "surface": args.surface,
         "verification_uri": response["verification_uri"],
         "verification_uri_complete": response["verification_uri_complete"],
         "user_code": response["user_code"],
-        "expires_in": response["expires_in"],
-        "interval": response.get("interval", 5),
+        "expires_in": expires_in,
+        "interval": interval,
     }
     print(json_dumps(result))
+
+
+def command_login_poll(args: argparse.Namespace) -> None:
+    if args.interval <= 0:
+        raise SystemExit("Device-login poll failed: interval must be a positive integer")
+    if args.expires_in <= 0:
+        raise SystemExit("Device-login poll failed: expires_in must be a positive integer")
+
+    deadline = time.monotonic() + args.expires_in
+    while True:
+        response = _poll_device_login(args.device_code)
+        status = response["status"].lower()
+
+        if status == "pending":
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                print(json_dumps({"status": "expired"}))
+                return
+            time.sleep(min(args.interval, remaining))
+            continue
+
+        if status == "complete":
+            credential = response.get("credential")
+            if not isinstance(credential, str) or not credential:
+                raise SystemExit("Device-login poll failed: complete response missing credential")
+            profile_name = args.profile or selected_profile_name()
+            path = store_device_login_credential(credential, profile_name)
+            print(json_dumps({
+                "status": "complete",
+                "config_file": str(path),
+                "config_file_mode": config_file_mode(path),
+                "profile": profile_name,
+            }))
+            return
+
+        if status in {"denied", "expired"}:
+            print(json_dumps({"status": status}))
+            return
+
+        raise SystemExit(f"Device-login poll failed: unexpected status '{response['status']}'")
 
 
 def config_file_mode(path: pathlib.Path) -> str | None:
@@ -1120,6 +1210,30 @@ def main() -> int:
         help="Client surface identifier for the device-login request",
     )
     login_parser.set_defaults(func=command_login)
+
+    login_poll_parser = subparsers.add_parser(
+        "login-poll",
+        help="Poll the current device login and store the credential on completion",
+    )
+    add_profile_argument(login_poll_parser)
+    login_poll_parser.add_argument(
+        "--device-code",
+        required=True,
+        help="Device code returned by the login command",
+    )
+    login_poll_parser.add_argument(
+        "--interval",
+        required=True,
+        type=int,
+        help="Polling interval returned by the login command",
+    )
+    login_poll_parser.add_argument(
+        "--expires-in",
+        required=True,
+        type=int,
+        help="Expiration window in seconds returned by the login command",
+    )
+    login_poll_parser.set_defaults(func=command_login_poll)
 
     configure_parser = subparsers.add_parser("configure", help="Write a local Summation config file")
     configure_parser.add_argument("--profile", help="Profile name to create or update")
