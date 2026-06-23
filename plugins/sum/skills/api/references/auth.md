@@ -4,6 +4,12 @@ The skill must use public `sum-api` authentication only.
 
 ## Supported Runtime Inputs
 
+Device-login credential:
+
+```bash
+SUM_API_DEVICE_LOGIN_CREDENTIAL=sm_dls_...
+```
+
 Bearer token:
 
 ```bash
@@ -34,6 +40,7 @@ The file uses environment-style lines:
 
 ```bash
 SUM_API_BASE_URL=https://sandbox-api.summation.com
+SUM_API_DEVICE_LOGIN_CREDENTIAL=sm_dls_...
 SUM_API_CLIENT_ID=...
 SUM_API_CLIENT_SECRET=...
 SUM_API_M2M_SCOPE="agent:read agent:write"
@@ -46,12 +53,14 @@ SUM_API_ACTIVE_PROFILE=shared-sandbox
 
 [profile.shared-sandbox]
 SUM_API_BASE_URL=https://sandbox-api.summation.com
+SUM_API_DEVICE_LOGIN_CREDENTIAL=sm_dls_...
 SUM_API_CLIENT_ID=...
 SUM_API_CLIENT_SECRET=...
 SUM_API_M2M_SCOPE="agent:read agent:write"
 
 [profile.fanatics-prod]
 SUM_API_BASE_URL=https://api-fanatics.summation.com
+SUM_API_DEVICE_LOGIN_CREDENTIAL=sm_dls_...
 SUM_API_CLIENT_ID=...
 SUM_API_CLIENT_SECRET=...
 SUM_API_M2M_SCOPE="agent:read agent:write"
@@ -82,9 +91,25 @@ A config found only in a legacy location is copied to `~/.summation/skill-config
 
 Use file mode `0600` for files that contain secrets.
 
+## Auth Precedence
+
+The helper resolves auth in this order:
+
+1. `SUM_API_DEVICE_LOGIN_CREDENTIAL`
+2. `SUM_API_ACCESS_TOKEN`
+3. M2M via `SUM_API_CLIENT_ID` and `SUM_API_CLIENT_SECRET`
+
+## Device Login Flow
+
+Device login is the default interactive auth path for users.
+
+Use the sibling `login` skill for the step-by-step interactive flow. The helper starts login with `login`, completes approval with `login-poll`, and removes the local device-login credential with `logout`.
+
+On approval, the helper stores `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/skill-config`. Do not print or quote `device_code` in chat; it should only be carried forward into `login-poll`.
+
 ## M2M Flow
 
-When `SUM_API_ACCESS_TOKEN` is absent and M2M credentials are present, exchange the client credentials through:
+When both `SUM_API_DEVICE_LOGIN_CREDENTIAL` and `SUM_API_ACCESS_TOKEN` are absent and M2M credentials are present, exchange the client credentials through:
 
 ```text
 POST /v1/auth/m2m/token
