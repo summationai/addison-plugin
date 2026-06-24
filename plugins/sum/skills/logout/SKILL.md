@@ -1,6 +1,6 @@
 ---
 name: logout
-description: Remove the stored Summation device-login credential from the active or selected profile. Use when the user wants to disconnect Claude from Summation, switch accounts, or clear a stale device-login session.
+description: Remove the stored Summation device-login credential from the active or selected profile. Use when the user wants to disconnect Claude from Summation, sign in again as a different Summation user, or clear a stale device-login session.
 ---
 
 # Summation Logout
@@ -26,4 +26,4 @@ python3 ../api/scripts/sum_api.py logout [--profile <NAME>]
 
 - Logout removes only `SUM_API_DEVICE_LOGIN_CREDENTIAL`.
 - Never remove M2M settings as part of logout.
-- Report the config file path and profile that were affected.
+- Report the affected profile.
