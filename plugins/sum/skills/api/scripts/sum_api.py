@@ -581,6 +581,12 @@ def store_device_login_credential(credential: str, profile_name: str | None) -> 
     return path
 
 
+def stored_device_login_credential(profile_name: str | None) -> str | None:
+    if profile_name:
+        return normalize_device_login_credential(config_profiles().get(profile_name, {}).get(DEVICE_LOGIN_CREDENTIAL_KEY))
+    return device_login_credential()
+
+
 def clear_device_login_credential(profile_name: str | None) -> tuple[pathlib.Path, bool]:
     path = active_config_path() or home_config_path()
     file_config = read_config_from_path(path)
@@ -605,6 +611,20 @@ def clear_device_login_credential(profile_name: str | None) -> tuple[pathlib.Pat
 
     write_config_file(path, root_values, profiles)
     return path, removed
+
+
+def revoke_device_login_credential(credential: str) -> bool:
+    response = request_json(
+        "POST",
+        "/v1/auth/device-logins/revoke",
+        headers={"Authorization": f"Bearer {credential}"},
+    )
+    if not isinstance(response, dict) or "success" not in response:
+        raise SystemExit("Device-login logout failed: missing response field success")
+    success = response["success"]
+    if not isinstance(success, bool):
+        raise SystemExit("Device-login logout failed: response field success must be a boolean")
+    return success
 
 
 def iter_operations(spec: dict[str, Any]):
@@ -866,6 +886,16 @@ def command_login_poll(args: argparse.Namespace) -> None:
 
 def command_logout(args: argparse.Namespace) -> None:
     profile_name = args.profile or selected_profile_name()
+    credential = stored_device_login_credential(profile_name)
+    if not credential:
+        print(json_dumps({
+            "status": "already_logged_out",
+            "profile": profile_name,
+        }))
+        return
+    revoked = revoke_device_login_credential(credential)
+    if not revoked:
+        raise SystemExit("Device-login logout failed: revoke returned success=false")
     path, removed = clear_device_login_credential(profile_name)
     print(json_dumps({
         "status": "logged_out" if removed else "already_logged_out",

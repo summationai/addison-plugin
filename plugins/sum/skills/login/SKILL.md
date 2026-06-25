@@ -58,7 +58,7 @@ python3 ../api/scripts/sum_api.py call GET /v1/projects
 
 ## Logout
 
-Remove the locally stored device-login credential without touching any M2M settings:
+Revoke the current device-login session and remove the local credential without touching any M2M settings:
 
 ```bash
 python3 ../api/scripts/sum_api.py logout [--profile <NAME>]
