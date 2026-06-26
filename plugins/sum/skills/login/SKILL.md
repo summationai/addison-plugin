@@ -9,7 +9,10 @@ Set up sum-api credentials through device login by default. The helper lives in 
 
 ## Flow
 
-1. Ask the user for: base URL (default `https://sandbox-api.summation.com`) and an optional profile name.
+1. Ask the user to choose the Summation environment before running `login`. Do not silently assume the sandbox default.
+   - If the user already named an environment or base URL in the conversation, use that.
+   - Otherwise ask explicitly which environment to use. Offer `https://sandbox-api.summation.com` as the default option, but wait for confirmation before continuing.
+   - Also ask whether to use a profile name for this login.
 2. Start device login:
 
 ```bash
@@ -51,10 +54,10 @@ python3 ../api/scripts/sum_api.py login-poll \
 
 ```bash
 python3 ../api/scripts/sum_api.py doctor
-python3 ../api/scripts/sum_api.py call GET /v1/projects
+python3 ../api/scripts/sum_api.py call GET /v1/me
 ```
 
-6. Report: config path, active profile, and whether the authenticated list call succeeded (include `request_id` on failure).
+6. Report: config path, active profile, and whether the authenticated identity check succeeded (include `request_id` on failure).
 
 ## Logout
 

@@ -193,13 +193,13 @@ def selected_profile_values() -> dict[str, str]:
 
 
 def setting(name: str, default: str | None = None) -> str | None:
-    value = os.getenv(name)
-    if value is not None and value != "":
-        return value
     value = selected_profile_values().get(name)
     if value is not None and value != "":
         return value
     value = config_values().get(name)
+    if value is not None and value != "":
+        return value
+    value = os.getenv(name)
     if value is not None and value != "":
         return value
     return default
@@ -663,14 +663,12 @@ def store_device_login_credential(credential: str, profile_name: str | None) -> 
 
     if profile_name:
         target = dict(profiles.get(profile_name, {}))
-        if not target.get("SUM_API_BASE_URL"):
-            target["SUM_API_BASE_URL"] = base_url()
+        target["SUM_API_BASE_URL"] = base_url()
         target[DEVICE_LOGIN_CREDENTIAL_KEY] = normalized
         profiles[profile_name] = target
-        if not root_values.get(ACTIVE_PROFILE_KEY):
-            root_values[ACTIVE_PROFILE_KEY] = profile_name
+        root_values[ACTIVE_PROFILE_KEY] = profile_name
     else:
-        root_values.setdefault("SUM_API_BASE_URL", base_url())
+        root_values["SUM_API_BASE_URL"] = base_url()
         root_values[DEVICE_LOGIN_CREDENTIAL_KEY] = normalized
 
     write_config_file(path, root_values, profiles)
