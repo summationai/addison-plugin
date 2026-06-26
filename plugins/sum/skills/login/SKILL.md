@@ -40,6 +40,10 @@ python3 ../api/scripts/sum_api.py login-poll \
   [--profile <NAME>]
 ```
 
+   Start `login-poll` immediately after presenting the approval link. The user completes
+   approval in their browser, not in chat, so do not pause the flow waiting for a chat
+   reply before starting the poll step.
+
    `login` stores temporary local polling state with file mode `0600`, including the
    originating base URL, so `login-poll`
    normally does not need `device_code`, `interval`, or `expires_in` on the command line.
