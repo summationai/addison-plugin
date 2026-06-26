@@ -46,7 +46,10 @@ python3 $SKILL/scripts/sum_api.py operation list_agent_projects_v1_projects_get
 - `call <METHOD> <path>` — call any path directly. Flags: `--query`, `--body`, `--stream`.
 - `operation <operationId>` — call a discovered operation. Flags: `--params`, `--body`, `--stream`.
 - `token` — print a fresh M2M access token (for piping into `curl`).
-- `configure` — write a local `.summation-config` (mode `0600`).
+- `login` — start device login, store temporary local polling state (`0600`), and return chat-safe fields (`verification_uri_complete`, `user_code`, `expires_in`). Accepts `--base-url` for environments that are not already configured.
+- `login-poll` — poll the locally pending device login to terminal state; on `approved` it stores the device-login credential locally and clears the temporary polling state. Accepts `--profile` to select among multiple pending logins.
+- `logout` — revoke the stored device-login session and remove its local credential from the selected profile without touching M2M settings.
+- `configure` — write local M2M configuration (mode `0600`) for fallback/admin use.
 - `profiles` — list named profiles in `.summation-config` with secrets redacted.
 - `use-profile <name>` — set the active profile in `.summation-config`.
 - `doctor` — sanity check (base URL, config file, OpenAPI reachability, auth inputs).
@@ -76,7 +79,17 @@ python3 $SKILL/scripts/sum_api.py call --stream \
 
 ## Auth
 
-Ask the user to drop the `.summation-config` that you can copy over to the $SKILL folder or ask user to point to a file that contains `SUM_API_BASE_URL`, `SUM_API_CLIENT_ID` and `SUM_API_CLIENT_SECRET`.
+Prefer device login over M2M when both are viable.
+
+Auth precedence in the helper is:
+
+1. `SUM_API_DEVICE_LOGIN_CREDENTIAL`
+2. `SUM_API_ACCESS_TOKEN`
+3. M2M via `SUM_API_CLIENT_ID` and `SUM_API_CLIENT_SECRET`
+
+For interactive user login, use the sibling `login` skill. It owns the device-login flow, what to show the user, polling behavior, and logout guidance.
+
+If device login is unavailable and the user already has machine credentials, fall back to M2M configuration.
 
 The config can hold multiple tenant profiles:
 
@@ -85,12 +98,14 @@ SUM_API_ACTIVE_PROFILE=fanatics-sandbox
 
 [profile.fanatics-sandbox]
 SUM_API_BASE_URL=https://sandbox-api-fanatics.summation.com
+SUM_API_DEVICE_LOGIN_CREDENTIAL=sm_dls_...
 SUM_API_CLIENT_ID=...
 SUM_API_CLIENT_SECRET=...
 SUM_API_M2M_SCOPE="agent:read agent:write"
 
 [profile.shared-prod]
 SUM_API_BASE_URL=https://api.summation.com
+SUM_API_DEVICE_LOGIN_CREDENTIAL=sm_dls_...
 SUM_API_CLIENT_ID=...
 SUM_API_CLIENT_SECRET=...
 SUM_API_M2M_SCOPE="agent:read agent:write"
@@ -106,13 +121,13 @@ python3 scripts/sum_api.py call --profile shared-prod GET /v1/projects
 
 Never write credentials into committed skill source, generated examples, commits, logs, or PR descriptions.
 
-If credentials should persist locally, use:
+If M2M credentials should persist locally, use:
 
 ```bash
 python3 scripts/sum_api.py configure
 ```
 
-This writes `~/.summation/skill-config` with file mode `0600`. The helper loads settings in this order: environment variables, explicit `SUM_API_CONFIG_FILE`, current directory `.summation-config`, `~/.summation/skill-config`, then legacy locations (installed skill `.summation-config`, home `~/.summation-config`). A config found only in a legacy location is migrated to `~/.summation/skill-config` on first use; the legacy file is left in place.
+This writes `~/.summation/skill-config` with file mode `0600`. Config-file discovery still checks explicit `SUM_API_CONFIG_FILE`, current directory `.summation-config`, `~/.summation/skill-config`, then legacy locations (installed skill `.summation-config`, home `~/.summation-config`). For resolved settings, the selected profile wins over root-level config, and shell `SUM_API_*` variables are only a fallback when the config does not provide a value. A config found only in a legacy location is migrated to `~/.summation/skill-config` on first use; the legacy file is left in place.
 
 Read `references/auth.md` before changing auth behavior or troubleshooting token failures.
 

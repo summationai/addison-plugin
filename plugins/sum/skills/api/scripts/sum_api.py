@@ -16,11 +16,18 @@ from typing import Any
 
 DEFAULT_BASE_URL = "https://sandbox-api.summation.com"
 CONFIG_FILE_NAME = ".summation-config"
+DEVICE_LOGIN_STATE_FILE_NAME = ".device-login-state.json"
 ACTIVE_PROFILE_KEY = "SUM_API_ACTIVE_PROFILE"
 PROFILE_ENV_KEYS = ("SUM_API_PROFILE", "SUMMATION_PROFILE")
 CONFIG_PATH_ENV_KEYS = ("SUM_API_CONFIG_FILE", "SUMMATION_CONFIG")
 PROFILE_SECTION_PREFIX = "profile."
+DEVICE_LOGIN_CREDENTIAL_KEY = "SUM_API_DEVICE_LOGIN_CREDENTIAL"
+DEVICE_LOGIN_ALLOWED_SURFACES = (
+    "claude-code",
+    "claude-desktop",
+)
 PROFILE_OVERRIDE: str | None = None
+BASE_URL_OVERRIDE: str | None = None
 
 
 def skill_root() -> pathlib.Path:
@@ -29,6 +36,10 @@ def skill_root() -> pathlib.Path:
 
 def home_config_path() -> pathlib.Path:
     return pathlib.Path.home() / ".summation" / "skill-config"
+
+
+def device_login_state_path() -> pathlib.Path:
+    return pathlib.Path.home() / ".summation" / DEVICE_LOGIN_STATE_FILE_NAME
 
 
 def legacy_config_paths() -> list[pathlib.Path]:
@@ -182,24 +193,166 @@ def selected_profile_values() -> dict[str, str]:
 
 
 def setting(name: str, default: str | None = None) -> str | None:
-    value = os.getenv(name)
-    if value is not None and value != "":
-        return value
     value = selected_profile_values().get(name)
     if value is not None and value != "":
         return value
     value = config_values().get(name)
     if value is not None and value != "":
         return value
+    value = os.getenv(name)
+    if value is not None and value != "":
+        return value
     return default
 
 
 def base_url() -> str:
+    if BASE_URL_OVERRIDE:
+        return BASE_URL_OVERRIDE.rstrip("/")
     return setting("SUM_API_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+
+
+def normalize_device_login_credential(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if not normalized.startswith("sm_dls_"):
+        raise SystemExit(
+            f"{DEVICE_LOGIN_CREDENTIAL_KEY} must start with 'sm_dls_'"
+        )
+    return normalized
+
+
+def device_login_credential() -> str | None:
+    return normalize_device_login_credential(setting(DEVICE_LOGIN_CREDENTIAL_KEY))
+
+
+def auth_mode(
+    *,
+    values: dict[str, str] | None = None,
+    selected_values: dict[str, str] | None = None,
+) -> str | None:
+    if values is None:
+        if device_login_credential():
+            return "device_login"
+        if setting("SUM_API_ACCESS_TOKEN"):
+            return "access_token"
+        if setting("SUM_API_CLIENT_ID") and setting("SUM_API_CLIENT_SECRET"):
+            return "m2m"
+        return None
+
+    def value_for(key: str) -> str | None:
+        if key in values:
+            value = values.get(key)
+            return value if value else None
+        if selected_values and key in selected_values:
+            value = selected_values.get(key)
+            return value if value else None
+        return None
+
+    if normalize_device_login_credential(value_for(DEVICE_LOGIN_CREDENTIAL_KEY)):
+        return "device_login"
+    if value_for("SUM_API_ACCESS_TOKEN"):
+        return "access_token"
+    if value_for("SUM_API_CLIENT_ID") and value_for("SUM_API_CLIENT_SECRET"):
+        return "m2m"
+    return None
 
 
 def json_dumps(value: Any) -> str:
     return json.dumps(value, indent=2, sort_keys=True)
+
+
+def _device_login_state_key(profile_name: str | None, base_url_value: str) -> str:
+    if profile_name:
+        return f"profile:{profile_name}"
+    return f"base_url:{base_url_value.rstrip('/')}"
+
+
+def _read_device_login_states() -> dict[str, dict[str, Any]]:
+    path = device_login_state_path()
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Device-login state file is unreadable: {path} ({exc})") from exc
+    if not isinstance(raw, dict):
+        raise SystemExit(f"Device-login state file is invalid: {path}")
+    states: dict[str, dict[str, Any]] = {}
+    for key, value in raw.items():
+        if isinstance(key, str) and isinstance(value, dict):
+            states[key] = value
+    return states
+
+
+def _write_device_login_states(states: dict[str, dict[str, Any]]) -> pathlib.Path:
+    path = device_login_state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(states, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.chmod(path, 0o600)
+    return path
+
+
+def store_pending_device_login(
+    *,
+    profile_name: str | None,
+    surface: str,
+    device_code: str,
+    interval: int,
+    expires_in: int,
+) -> pathlib.Path:
+    now = time.time()
+    state = {
+        "profile": profile_name,
+        "base_url": base_url(),
+        "surface": surface,
+        "device_code": device_code,
+        "interval": interval,
+        "expires_in": expires_in,
+        "created_at": now,
+        "expires_at": now + expires_in,
+    }
+    states = _read_device_login_states()
+    states[_device_login_state_key(profile_name, base_url())] = state
+    return _write_device_login_states(states)
+
+
+def load_pending_device_login(profile_name: str | None) -> tuple[str, dict[str, Any]]:
+    states = _read_device_login_states()
+    if profile_name:
+        key = _device_login_state_key(profile_name, base_url())
+        state = states.get(key)
+        if state is not None:
+            return key, state
+        profile_key = f"profile:{profile_name}"
+        state = states.get(profile_key)
+        if state is not None:
+            return profile_key, state
+        raise SystemExit(
+            f"No pending device login for profile '{profile_name}'. Run the login command again."
+        )
+    if not states:
+        raise SystemExit("No pending device login found. Run the login command again.")
+    if len(states) == 1:
+        return next(iter(states.items()))
+    raise SystemExit(
+        "Multiple pending device logins exist. Re-run with --profile to select one."
+    )
+
+
+def clear_pending_device_login(profile_name: str | None, base_url_value: str) -> pathlib.Path | None:
+    path = device_login_state_path()
+    if not path.exists():
+        return None
+    states = _read_device_login_states()
+    states.pop(_device_login_state_key(profile_name, base_url_value), None)
+    if states:
+        _write_device_login_states(states)
+    else:
+        path.unlink()
+    return path
 
 
 def parse_json_arg(raw: str | None, default: Any) -> Any:
@@ -373,9 +526,11 @@ def exchange_m2m_token() -> str:
 
 
 def auth_headers(required: bool = True) -> dict[str, str]:
-    token = setting("SUM_API_ACCESS_TOKEN")
+    token = device_login_credential()
     if not token:
-        token = exchange_m2m_token() if required else None
+        token = setting("SUM_API_ACCESS_TOKEN")
+    if not token and required:
+        token = exchange_m2m_token()
     if not token:
         return {}
     return {"Authorization": f"Bearer {token}"}
@@ -456,6 +611,114 @@ def request_stream(
     except urllib.error.URLError as exc:
         _audit(method, url, started, None, None, error=str(exc.reason))
         raise SystemExit(format_url_error(exc)) from exc
+
+
+def _expect_device_login_start_response(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise SystemExit("Device-login start failed: expected a JSON object response")
+    required = (
+        "device_code",
+        "user_code",
+        "verification_uri",
+        "verification_uri_complete",
+        "expires_in",
+    )
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise SystemExit(
+            "Device-login start failed: missing response fields "
+            + ", ".join(missing)
+        )
+    return payload
+
+
+def _poll_device_login(device_code: str) -> dict[str, Any]:
+    response = request_json(
+        "POST",
+        "/v1/auth/device-logins/tokens",
+        body={"device_code": device_code},
+    )
+    if "status" not in response:
+        raise SystemExit("Device-login poll failed: missing response field status")
+    return response
+
+
+def _normalize_poll_interval(value: Any) -> int:
+    if not isinstance(value, int) or value <= 0:
+        return 5
+    return value
+
+
+def store_device_login_credential(credential: str, profile_name: str | None) -> pathlib.Path:
+    normalized = normalize_device_login_credential(credential)
+    if not normalized:
+        raise SystemExit("Device-login poll failed: credential was empty")
+    path = active_config_path() or home_config_path()
+    file_config = read_config_from_path(path)
+    root_values = dict(file_config.get("values", {}))
+    profiles = {
+        name: dict(profile)
+        for name, profile in file_config.get("profiles", {}).items()
+    }
+
+    if profile_name:
+        target = dict(profiles.get(profile_name, {}))
+        target["SUM_API_BASE_URL"] = base_url()
+        target[DEVICE_LOGIN_CREDENTIAL_KEY] = normalized
+        profiles[profile_name] = target
+        root_values[ACTIVE_PROFILE_KEY] = profile_name
+    else:
+        root_values["SUM_API_BASE_URL"] = base_url()
+        root_values[DEVICE_LOGIN_CREDENTIAL_KEY] = normalized
+
+    write_config_file(path, root_values, profiles)
+    return path
+
+
+def stored_device_login_credential(profile_name: str | None) -> str | None:
+    if profile_name:
+        return normalize_device_login_credential(config_profiles().get(profile_name, {}).get(DEVICE_LOGIN_CREDENTIAL_KEY))
+    return device_login_credential()
+
+
+def clear_device_login_credential(profile_name: str | None) -> tuple[pathlib.Path, bool]:
+    path = active_config_path() or home_config_path()
+    file_config = read_config_from_path(path)
+    root_values = dict(file_config.get("values", {}))
+    profiles = {
+        name: dict(profile)
+        for name, profile in file_config.get("profiles", {}).items()
+    }
+
+    removed = False
+    if profile_name:
+        target = dict(profiles.get(profile_name, {}))
+        if DEVICE_LOGIN_CREDENTIAL_KEY in target:
+            removed = True
+            del target[DEVICE_LOGIN_CREDENTIAL_KEY]
+        if profile_name in profiles:
+            profiles[profile_name] = target
+    else:
+        if DEVICE_LOGIN_CREDENTIAL_KEY in root_values:
+            removed = True
+            del root_values[DEVICE_LOGIN_CREDENTIAL_KEY]
+
+    write_config_file(path, root_values, profiles)
+    return path, removed
+
+
+def revoke_device_login_credential(credential: str) -> bool:
+    response = request_json(
+        "POST",
+        "/v1/auth/device-logins/revoke",
+        headers={"Authorization": f"Bearer {credential}"},
+    )
+    if not isinstance(response, dict) or "success" not in response:
+        raise SystemExit("Device-login logout failed: missing response field success")
+    success = response["success"]
+    if not isinstance(success, bool):
+        raise SystemExit("Device-login logout failed: response field success must be a boolean")
+    return success
 
 
 def iter_operations(spec: dict[str, Any]):
@@ -651,6 +914,122 @@ def command_token(_: argparse.Namespace) -> None:
     print(json_dumps({"access_token": exchange_m2m_token()}))
 
 
+def command_login(args: argparse.Namespace) -> None:
+    response = _expect_device_login_start_response(
+        request_json(
+            "POST",
+            "/v1/auth/device-logins",
+            body={"surface": args.surface},
+        )
+    )
+    expires_in = response["expires_in"]
+    if not isinstance(expires_in, int) or expires_in <= 0:
+        raise SystemExit("Device-login start failed: expires_in must be a positive integer")
+    interval = _normalize_poll_interval(response.get("interval"))
+    profile_name = args.profile or selected_profile_name()
+    store_pending_device_login(
+        profile_name=profile_name,
+        surface=args.surface,
+        device_code=response["device_code"],
+        interval=interval,
+        expires_in=expires_in,
+    )
+    result = {
+        "profile": profile_name,
+        "verification_uri_complete": response["verification_uri_complete"],
+        "user_code": response["user_code"],
+        "expires_in": expires_in,
+    }
+    print(json_dumps(result))
+
+
+def command_login_poll(args: argparse.Namespace) -> None:
+    profile_name = args.profile or selected_profile_name()
+    _, pending_state = load_pending_device_login(profile_name)
+    device_code = pending_state.get("device_code")
+    interval = pending_state.get("interval")
+    pending_state_base_url = pending_state.get("base_url")
+    expires_at = pending_state.get("expires_at")
+
+    if not isinstance(device_code, str) or not device_code:
+        raise SystemExit("Device-login poll failed: pending state is missing device_code")
+    if not isinstance(interval, int) or interval <= 0:
+        raise SystemExit("Device-login poll failed: pending state is missing interval")
+    if not isinstance(pending_state_base_url, str) or not pending_state_base_url:
+        raise SystemExit("Device-login poll failed: pending state is missing base_url")
+    if not isinstance(expires_at, (int, float)):
+        raise SystemExit("Device-login poll failed: pending state is missing expires_at")
+
+    expires_in = int(expires_at - time.time())
+    if expires_in <= 0:
+        clear_pending_device_login(profile_name, pending_state_base_url)
+        print(json_dumps({"status": "expired"}))
+        return
+
+    global BASE_URL_OVERRIDE
+    BASE_URL_OVERRIDE = pending_state_base_url.rstrip("/")
+
+    deadline = time.monotonic() + expires_in
+    while True:
+        response = _poll_device_login(device_code)
+        status = response["status"].lower()
+
+        if status == "pending":
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                if pending_state_base_url:
+                    clear_pending_device_login(profile_name, pending_state_base_url)
+                print(json_dumps({"status": "expired"}))
+                return
+            time.sleep(min(interval, remaining))
+            continue
+
+        if status == "approved":
+            credential = response.get("credential")
+            if not isinstance(credential, str) or not credential:
+                raise SystemExit("Device-login poll failed: approved response missing credential")
+            path = store_device_login_credential(credential, profile_name)
+            if pending_state_base_url:
+                clear_pending_device_login(profile_name, pending_state_base_url)
+            print(json_dumps({
+                "status": "approved",
+                "config_file": str(path),
+                "config_file_mode": config_file_mode(path),
+                "profile": profile_name,
+            }))
+            return
+
+        if status in {"denied", "expired"}:
+            if pending_state_base_url:
+                clear_pending_device_login(profile_name, pending_state_base_url)
+            print(json_dumps({"status": status}))
+            return
+
+    raise SystemExit(f"Device-login poll failed: unexpected status '{response['status']}'")
+
+
+def command_logout(args: argparse.Namespace) -> None:
+    profile_name = args.profile or selected_profile_name()
+    credential = stored_device_login_credential(profile_name)
+    if not credential:
+        print(json_dumps({
+            "status": "already_logged_out",
+            "profile": profile_name,
+        }))
+        return
+    revoked = revoke_device_login_credential(credential)
+    if not revoked:
+        raise SystemExit("Device-login logout failed: revoke returned success=false")
+    path, removed = clear_device_login_credential(profile_name)
+    clear_pending_device_login(profile_name, base_url())
+    print(json_dumps({
+        "status": "logged_out" if removed else "already_logged_out",
+        "config_file": str(path),
+        "config_file_mode": config_file_mode(path),
+        "profile": profile_name,
+    }))
+
+
 def config_file_mode(path: pathlib.Path) -> str | None:
     if not path.exists():
         return None
@@ -669,7 +1048,7 @@ def prompt_if_needed(label: str, current: str | None, *, secret: bool = False) -
 def redacted_values(values: dict[str, str]) -> dict[str, str]:
     redacted = {}
     for key, value in values.items():
-        if "SECRET" in key or "TOKEN" in key:
+        if "SECRET" in key or "TOKEN" in key or "CREDENTIAL" in key:
             redacted[key] = "[redacted]" if value else ""
         else:
             redacted[key] = value
@@ -771,6 +1150,8 @@ def command_doctor(_: argparse.Namespace) -> None:
         "openapi_title": spec.get("info", {}).get("title"),
         "openapi_version": spec.get("info", {}).get("version"),
         "path_count": len(spec.get("paths", {})),
+        "preferred_auth_mode": auth_mode(),
+        "has_device_login_credential": bool(device_login_credential()),
         "has_access_token": bool(setting("SUM_API_ACCESS_TOKEN")),
         "has_m2m_credentials": bool(setting("SUM_API_CLIENT_ID") and setting("SUM_API_CLIENT_SECRET")),
     }
@@ -779,17 +1160,44 @@ def command_doctor(_: argparse.Namespace) -> None:
 
 def command_profiles(_: argparse.Namespace) -> None:
     profiles = config_profiles()
+    root_values = config_values()
+    selected_values = selected_profile_values()
     print(json_dumps({
         "active_profile": selected_profile_name(),
+        "preferred_auth_mode": auth_mode(),
         "config_file": str(active_config_path()) if active_config_path() else None,
         "profiles": [
             {
                 "name": name,
                 "active": name == selected_profile_name(),
+                "auth_mode": auth_mode(values=values),
+                "has_device_login_credential": bool(
+                    normalize_device_login_credential(values.get(DEVICE_LOGIN_CREDENTIAL_KEY))
+                ),
+                "has_access_token": bool(values.get("SUM_API_ACCESS_TOKEN")),
+                "has_m2m_credentials": bool(
+                    values.get("SUM_API_CLIENT_ID") and values.get("SUM_API_CLIENT_SECRET")
+                ),
                 "settings": redacted_values(values),
             }
             for name, values in sorted(profiles.items())
         ],
+        "selected_profile_settings": {
+            "auth_mode": auth_mode(values=selected_values, selected_values=root_values),
+            "has_device_login_credential": bool(
+                normalize_device_login_credential(
+                    selected_values.get(DEVICE_LOGIN_CREDENTIAL_KEY)
+                    or root_values.get(DEVICE_LOGIN_CREDENTIAL_KEY)
+                )
+            ),
+            "has_access_token": bool(
+                selected_values.get("SUM_API_ACCESS_TOKEN") or root_values.get("SUM_API_ACCESS_TOKEN")
+            ),
+            "has_m2m_credentials": bool(
+                (selected_values.get("SUM_API_CLIENT_ID") or root_values.get("SUM_API_CLIENT_ID"))
+                and (selected_values.get("SUM_API_CLIENT_SECRET") or root_values.get("SUM_API_CLIENT_SECRET"))
+            ),
+        },
         "legacy_settings": redacted_values(config_values()),
     }))
 
@@ -817,6 +1225,10 @@ def command_use_profile(args: argparse.Namespace) -> None:
 
 def add_profile_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--profile", help="Named profile from .summation-config")
+
+
+def add_base_url_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--base-url", dest="base_url", help="sum-api base URL")
 
 
 def _extract_items(payload: Any) -> list[Any]:
@@ -985,6 +1397,34 @@ def main() -> int:
     add_profile_argument(token_parser)
     token_parser.set_defaults(func=command_token)
 
+    login_parser = subparsers.add_parser(
+        "login",
+        help="Start device login and print the browser approval instructions",
+    )
+    add_profile_argument(login_parser)
+    add_base_url_argument(login_parser)
+    login_parser.add_argument(
+        "--surface",
+        default="claude-code",
+        choices=DEVICE_LOGIN_ALLOWED_SURFACES,
+        help="Client surface identifier for the device-login request",
+    )
+    login_parser.set_defaults(func=command_login)
+
+    login_poll_parser = subparsers.add_parser(
+        "login-poll",
+        help="Poll the current device login and store the credential on completion",
+    )
+    add_profile_argument(login_poll_parser)
+    login_poll_parser.set_defaults(func=command_login_poll)
+
+    logout_parser = subparsers.add_parser(
+        "logout",
+        help="Remove the stored device-login credential from the selected profile",
+    )
+    add_profile_argument(logout_parser)
+    logout_parser.set_defaults(func=command_logout)
+
     configure_parser = subparsers.add_parser("configure", help="Write a local Summation config file")
     configure_parser.add_argument("--profile", help="Profile name to create or update")
     configure_parser.add_argument(
@@ -1022,8 +1462,9 @@ def main() -> int:
     use_profile_parser.set_defaults(func=command_use_profile)
 
     args = parser.parse_args()
-    global PROFILE_OVERRIDE
+    global PROFILE_OVERRIDE, BASE_URL_OVERRIDE
     PROFILE_OVERRIDE = getattr(args, "profile", None)
+    BASE_URL_OVERRIDE = getattr(args, "base_url", None)
     args.func(args)
     return 0
 
