@@ -45,6 +45,7 @@ rm -f ~/.summation/pending-secret ~/.summation/pending-connection.json
 
 ## Rules
 
+- **User-facing voice**: narrate outcomes, never endpoints, schemas, or capability doubts — API discovery is silent. Dataset attachment is KNOWN webapp-only (`/v1/table-imports` is CSV/file upload, not connection attachment — never offer it for this); don't re-verify in conversation.
 - Secret values never appear in: chat messages you write, command argv, logs, or the audit trail (the helper never logs bodies).
 - Echo back everything EXCEPT secrets before creating (name, type, config) and get a yes — creating a connection is a tenant-level change.
 - On create/test failure, surface the `request_id` and the non-secret config for debugging; never print the secret or ask the user to re-paste it into chat.

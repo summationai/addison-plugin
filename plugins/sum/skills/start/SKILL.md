@@ -65,6 +65,22 @@ python3 ../api/scripts/sum_api.py call --stream \
 
 Update the visual: numbered report-idea cards (title + one-line what-you'll-learn). Then ask the user directly: "Want me to run one of these? Reply 1, 2, 3 — or describe your own." On yes → hand off to the `report` skill pipeline (snapshot ids → generate → export **markdown** → show it → offer `/sum:validate`). Mark step 4 done in the final visual, with the report path and a "what's next" line (`/sum:query`, `/sum:catalog`, `/sum:report`).
 
+## Voice (user-facing — this is onboarding, not a debugging session)
+
+- Speak in **outcomes**, never mechanics: "Checking what I can set up from here…", not "Let me inspect /v1/table-imports". The user never sees endpoint paths, schema inspection, operation names, or `describe` output.
+- **Never narrate capability uncertainty.** "Double-checking whether attaching can be done via the API at all" is a developer thought — the capability map below already answers it; consult it silently.
+- API discovery (operations/describe/schema calls) happens **silently**. The only API artifact a user should ever see is a `request_id`, and only when something fails.
+
+## Capability map (KNOWN — never re-derive or explore alternatives mid-flow)
+
+| Action | In-flow via API? |
+|---|---|
+| Create + test a data connection | ✅ (`connect` skill) |
+| Attach a connection's source tables as datasets | ❌ webapp-only — and `/v1/table-imports` is CSV/file upload, NOT connection attachment; never use it for this |
+| Attach tables to a project catalog | ✅ (`catalog-entries`) |
+| Generate / validate / export reports | ✅ |
+| Schedule recurring runs | ✅ (`schedule` skill) |
+
 ## Rules
 
 - **`datasets_total` is the source of truth for "data is analyzable" — never table counts, never browsable sources.** Every tenant carries internal/grid system tables (table counts prove nothing), and a connection's reachable databases are merely attachable (browse output proves nothing). Never assume, invent, or embellish data; the source map mirrors `preflight` output exactly.
