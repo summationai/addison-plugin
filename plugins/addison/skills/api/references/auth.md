@@ -19,7 +19,7 @@ SUM_API_ACCESS_TOKEN=...
 Local config file:
 
 ```text
-~/.summation/skill-config
+~/.summation/config
 ```
 
 The file uses environment-style lines:
@@ -35,11 +35,11 @@ The helper reads settings in this order:
 1. Environment variables.
 2. `SUM_API_CONFIG_FILE`.
 3. Current directory `.summation-config`.
-4. `~/.summation/skill-config` (canonical).
+4. `~/.summation/config` (canonical).
 5. Installed skill directory `.summation-config` (legacy).
 6. Home directory `.summation-config` (legacy).
 
-A config found only in a legacy location is copied to `~/.summation/skill-config` on first use; the legacy file is left in place and the canonical path wins afterward.
+A config found only in a legacy location is copied to `~/.summation/config` on first use; the legacy file is left in place and the canonical path wins afterward.
 
 Use file mode `0600` for files that contain secrets.
 
@@ -60,7 +60,7 @@ Device login is the only interactive auth path.
 
 Use the sibling `login` skill for the step-by-step interactive flow. The helper starts login with `login`, stores temporary local polling state (`0600`), completes approval with `login-poll`, registers the hosted MCP server with `mcp-connect`, and revokes the device-login session plus removes the local credential with `logout` (pair with `mcp-disconnect`).
 
-On approval, the helper stores `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/skill-config`. Do not print or quote `device_code` in chat; the helper keeps it only in temporary local polling state until `login-poll` finishes.
+On approval, the helper stores `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/config`. Do not print or quote `device_code` in chat; the helper keeps it only in temporary local polling state until `login-poll` finishes.
 
 ## MCP Registration
 

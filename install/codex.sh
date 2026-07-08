@@ -28,7 +28,7 @@ fi
 ln -s "$SRC" "$DEST"
 echo "installed: $DEST -> $SRC"
 echo
-echo "Credentials: run 'python3 $DEST/scripts/sum_api.py configure' (stores ~/.summation/skill-config, 0600)."
+echo "Credentials: use the login flow in the plugin's login skill (stores ~/.summation/config, 0600)."
 echo "Verify:      python3 $DEST/scripts/sum_api.py doctor"
 echo
 echo "When the hosted Summation MCP server ships, add to ~/.codex/config.toml:"

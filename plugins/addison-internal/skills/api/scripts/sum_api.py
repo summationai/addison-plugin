@@ -44,7 +44,10 @@ def skill_root() -> pathlib.Path:
 
 
 def home_config_path() -> pathlib.Path:
-    return pathlib.Path.home() / ".summation" / "skill-config"
+    # Per-edition canonical config so external (prod-pinned, device-login-only) and internal
+    # (multi-env, M2M, profiles) never share a file.
+    name = "config" if EDITION == "external" else "config.internal"
+    return pathlib.Path.home() / ".summation" / name
 
 
 def device_login_state_path() -> pathlib.Path:
@@ -52,7 +55,12 @@ def device_login_state_path() -> pathlib.Path:
 
 
 def legacy_config_paths() -> list[pathlib.Path]:
-    return [skill_root() / CONFIG_FILE_NAME, pathlib.Path.home() / CONFIG_FILE_NAME]
+    paths = [skill_root() / CONFIG_FILE_NAME, pathlib.Path.home() / CONFIG_FILE_NAME]
+    if EDITION == "internal":
+        # Pre-edition installs stored config here; only internal inherits it (it may hold
+        # sandbox base URLs / M2M values the external build must not pick up).
+        paths.insert(0, pathlib.Path.home() / ".summation" / "skill-config")
+    return paths
 
 
 def migrate_legacy_config(found: pathlib.Path) -> pathlib.Path:
@@ -77,12 +85,9 @@ def candidate_config_paths() -> list[pathlib.Path]:
         explicit = os.getenv(env_key)
         if explicit:
             paths.append(pathlib.Path(explicit).expanduser())
-    paths.extend([
-        pathlib.Path.cwd() / CONFIG_FILE_NAME,
-        home_config_path(),
-        skill_root() / CONFIG_FILE_NAME,
-        pathlib.Path.home() / CONFIG_FILE_NAME,
-    ])
+    paths.append(pathlib.Path.cwd() / CONFIG_FILE_NAME)
+    paths.append(home_config_path())
+    paths.extend(legacy_config_paths())
     seen = set()
     unique_paths = []
     for path in paths:
