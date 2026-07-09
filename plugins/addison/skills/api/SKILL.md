@@ -72,7 +72,7 @@ python3 $SKILL/scripts/sum_api.py call --stream \
 
 ## Auth
 
-Device login only. The stored credential (`SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/skill-config`, file mode `0600`) authenticates every call; `SUM_API_ACCESS_TOKEN` is honored if present. There is no M2M path in this build.
+Device login only. The stored credential (`SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/config`, file mode `0600`) authenticates every call; `SUM_API_ACCESS_TOKEN` is honored if present. There is no M2M path in this build.
 
 For interactive user login, use the sibling `login` skill. It owns the device-login flow, what to show the user, polling behavior, MCP registration, and logout guidance. If no credential is stored, the helper exits with "Not signed in to Summation. Run /addison:login to connect." — do that, don't improvise auth.
 

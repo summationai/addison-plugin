@@ -49,10 +49,10 @@ python3 ../api/scripts/sum_api.py login-poll \
    originating base URL, so `login-poll`
    normally does not need `device_code`, `interval`, or `expires_in` on the command line.
 
-   On success this stores `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/skill-config` with file mode `0600`.
+   On success this stores `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/config.internal` with file mode `0600`.
 
    Treat `login-poll` as the terminal step in the flow. It should normally return one of these outcomes:
-   - `{"status":"approved", ...}`: approval succeeded. The helper already stored `SUM_API_DEVICE_LOGIN_CREDENTIAL` locally in `~/.summation/skill-config` (file mode `0600`). Continue to verification.
+   - `{"status":"approved", ...}`: approval succeeded. The helper already stored `SUM_API_DEVICE_LOGIN_CREDENTIAL` locally in `~/.summation/config.internal` (file mode `0600`). Continue to verification.
    - `{"status":"denied"}`: the user rejected the request in the browser. No credential was stored. Offer to start over with a fresh `login` flow.
    - `{"status":"expired"}`: the approval link expired. No credential was stored. Offer to start over with a fresh `login` flow.
 
