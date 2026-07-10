@@ -33,7 +33,7 @@ Then start a new Codex thread and use `$addison-login`. One browser sign-in stor
 |---|---|---|
 | `start` | `/addison:start` | **guided onboarding**: visual stepper → connect → source map → meet Addison → suggested reports → run one on confirm |
 | `api` | model-invoked | OpenAPI-discovery workflow + `scripts/sum_api.py` helper (canonical; sibling skills reference it); first-run source map |
-| `login` | `/addison:login` | conversational credential setup → `~/.summation/config` (0600) |
+| `login` | `/addison:login` | conversational credential setup → `~/.summation/summation-config` (0600) |
 | `logout` | `/addison:logout` | remove the stored device-login credential from the active or selected profile |
 | `doctor` | `/addison:doctor` | connectivity/auth diagnosis + `preflight` environment summary |
 | `report` | `/addison:report` | generate a report from a question → export markdown/PDF/DOCX |

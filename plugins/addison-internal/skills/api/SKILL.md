@@ -127,7 +127,7 @@ If M2M credentials should persist locally, use:
 python3 scripts/sum_api.py configure
 ```
 
-This writes `~/.summation/config.internal` with file mode `0600`. Config-file discovery still checks explicit `SUM_API_CONFIG_FILE`, current directory `.summation-config`, `~/.summation/config.internal`, then legacy locations (installed skill `.summation-config`, home `~/.summation-config`). For resolved settings, the selected profile wins over root-level config, and shell `SUM_API_*` variables are only a fallback when the config does not provide a value. A config found only in a legacy location is migrated to `~/.summation/config.internal` on first use; the legacy file is left in place.
+This writes `~/.summation/summation-config-internal` with file mode `0600`. Config-file discovery still checks explicit `SUM_API_CONFIG_FILE`, current directory `.summation-config`, `~/.summation/summation-config-internal`, then legacy locations (installed skill `.summation-config`, home `~/.summation-config`). For resolved settings, the selected profile wins over root-level config, and shell `SUM_API_*` variables are only a fallback when the config does not provide a value. A config found only in a legacy location is migrated to `~/.summation/summation-config-internal` on first use; the legacy file is left in place.
 
 Read `references/auth.md` before changing auth behavior or troubleshooting token failures.
 

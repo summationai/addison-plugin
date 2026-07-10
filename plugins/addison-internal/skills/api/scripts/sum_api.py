@@ -52,8 +52,9 @@ def skill_root() -> pathlib.Path:
 
 def home_config_path() -> pathlib.Path:
     # Per-edition canonical config so external (prod-pinned, device-login-only) and internal
-    # (multi-env, M2M, profiles) never share a file.
-    name = "config" if EDITION == "external" else "config.internal"
+    # (multi-env, M2M, profiles) never share a file — and neither collides with the generic
+    # ~/.summation/config used by sumcli and legacy internal tooling.
+    name = "summation-config" if EDITION == "external" else "summation-config-internal"
     return pathlib.Path.home() / ".summation" / name
 
 

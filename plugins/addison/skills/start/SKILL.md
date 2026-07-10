@@ -23,7 +23,7 @@ Walk a brand-new user from zero to their first report, with a visual that tracks
 
 Run `doctor`. Three cases:
 - Credentials present and working → mark done, show tenant + scopes. If the MCP server isn't registered yet, run `mcp-connect` now.
-- No config → run the sibling `login` flow conversationally (never echo the secret; it stores to `~/.summation/config`, 0600). The flow ends by registering the Summation MCP server.
+- No config → run the sibling `login` flow conversationally (never echo the secret; it stores to `~/.summation/summation-config`, 0600). The flow ends by registering the Summation MCP server.
 - Config present but failing → diagnose per the `doctor` skill, fix or re-login.
 
 ### Step 2 — Discover (GATE: connections AND attached datasets required)

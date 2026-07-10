@@ -43,7 +43,7 @@ python3 ../api/scripts/sum_api.py login-poll
    reply before starting the poll step.
 
    Terminal outcomes:
-   - `{"status":"approved", ...}`: approval succeeded. The helper stored `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/config` (file mode `0600`). Continue.
+   - `{"status":"approved", ...}`: approval succeeded. The helper stored `SUM_API_DEVICE_LOGIN_CREDENTIAL` in `~/.summation/summation-config` (file mode `0600`). Continue.
    - `{"status":"denied"}`: the user rejected the request in the browser. No credential was stored. Offer to start over.
    - `{"status":"expired"}`: the approval link expired. No credential was stored. Offer to start over.
 
