@@ -6,7 +6,7 @@ argument-hint: "[postgres|snowflake|... or describe the source]"
 
 # Summation Connect
 
-Create a data connection via `POST /v1/connections/data` (`{name, type, config, secrets, description}` — secrets are stored server-side as secret refs). Helper: `../api/scripts/sum_api.py`. Always `describe create_data_connection` first for the current type-specific config shape.
+Create a data connection via `POST /v1/connections/data` (`{name, type, config, secrets, description}` — secrets are stored server-side as secret refs). Helper: `../api/scripts/sum_api.py`. Always `describe create_data_connection` first for the current type-specific config shape. The `/v1/connections/data...` paths here are illustrative — these routes have moved before, so if a call 404s, rediscover via `operations connections` / `operation <operationId>` (the contract is the source of truth).
 
 Connection **creation stays on the REST path** even when the `summation` MCP server is connected — the secret must travel via the local-file handoff below, never through a tool argument that lands in the transcript. Browsing/inspecting sources afterwards can use the MCP source-discovery tools.
 

@@ -1395,6 +1395,11 @@ def _payload_total(payload: Any, items: list[Any]) -> int:
         total = payload.get("total")
         if isinstance(total, int):
             return total
+        # _extract_items also unwraps a nested envelope (e.g. {"data": {"datasets": [...], "total": N}});
+        # honor a total carried at that same nesting so paged responses are not undercounted.
+        data = payload.get("data")
+        if isinstance(data, dict) and isinstance(data.get("total"), int):
+            return data["total"]
     return len(items)
 
 

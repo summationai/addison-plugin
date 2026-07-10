@@ -26,7 +26,7 @@ The OpenAPI document is authoritative; routes move and get renamed. **Any litera
 
 - **Prefer MCP tools** — they are generated from the live contract at server boot, so they are always current.
 - **Otherwise resolve by operation, not path:** `operations <noun>` to find the operation, then `operation <operationId>` to call it (the helper reads the current path from the live spec). This survives a path move.
-- **If a documented path returns `404`, do not trust it — rediscover** with `operations <noun>` and call by operationId. A 404 on a listed endpoint means the route moved, not that the resource is missing.
+- **If a documented path returns `404`, don't trust the literal path — rediscover** with `operations <noun>` and call by operationId. A 404 on a documented route often means it moved, so rediscover before concluding the resource is gone (it can also mean the specific resource doesn't exist or isn't accessible — the response body and status on the rediscovered call will tell you which).
 - The bundled `preflight` already resolves its routes this way (operationId, then keyword fallback, then a last-resort default), so it self-heals when the API shifts.
 
 ## Helper
