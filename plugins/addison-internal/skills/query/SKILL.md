@@ -8,7 +8,7 @@ argument-hint: <sql or data question> [--limit N]
 
 Execute bounded, read-only SQL via the public query API.
 
-**MCP-first**: when the `summation` MCP server is connected, use its query tool (same bounded, read-only semantics) instead of the REST call below; for open-ended data questions prefer `ask_analyst` (buffered result, ~15-60s — tell the user Addison is working). Helper fallback: `../api/scripts/sum_api.py`.
+**MCP-first**: when the `summation` MCP server is connected, use its query tool (same bounded, read-only semantics) instead of the REST call below; for open-ended data questions prefer `ask_analyst` (buffered result, ~15-60s — tell the user Addison is working). Helper fallback: `../api/scripts/sum_api.py`. The `/v1/...` path below is illustrative — if a call returns 404, the route moved: rediscover via `operations`/`operation` (the contract is the source of truth).
 
 ## Flow
 

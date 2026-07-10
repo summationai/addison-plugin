@@ -842,6 +842,37 @@ def find_operation(spec: dict[str, Any], operation_id: str) -> tuple[str, str, d
     raise SystemExit(f"Operation not found: {operation_id}")
 
 
+def resolve_operation(
+    spec: dict[str, Any],
+    candidate_ids: tuple[str, ...] = (),
+    *,
+    keywords: tuple[str, ...] = (),
+    method: str = "GET",
+    collection_only: bool = True,
+) -> tuple[str, str, dict[str, Any]] | None:
+    """Resolve a live (method, path, operation) from the contract by intent, so callers
+    never hardcode a path. Tries known operationIds first (precise); falls back to a
+    keyword match over operationId/summary/tags (survives an operationId rename). Returns
+    None if nothing matches, so the caller can fall back to a documented default."""
+    by_id = {op.get("operationId"): (m, p, op) for m, p, op in iter_operations(spec)}
+    for cid in candidate_ids:
+        if cid in by_id:
+            return by_id[cid]
+    if keywords:
+        for m, p, op in iter_operations(spec):
+            if m != method.upper():
+                continue
+            if collection_only and "{" in p:
+                continue
+            haystack = " ".join([
+                p, str(op.get("operationId", "")), str(op.get("summary", "")),
+                " ".join(op.get("tags", [])),
+            ]).lower()
+            if all(kw in haystack for kw in keywords):
+                return m, p, op
+    return None
+
+
 def fill_path(path: str, params: dict[str, Any]) -> str:
     filled = path
     for key, value in params.items():
@@ -1545,9 +1576,25 @@ def command_preflight(_: argparse.Namespace) -> None:
             return f"{_name_of(item)} ({', '.join(parts)})"
         return _name_of(item)
 
-    def section(name: str, method: str, path: str, *, limit_names: int = 15) -> None:
+    # Resolve every route from the live contract, not hardcoded paths. The tuples are
+    # (preferred operationIds, keyword fallback, last-resort default path) — so a path
+    # move self-heals via the operationId, and an operationId rename self-heals via the
+    # keyword match; the default only applies if the contract can't be fetched.
+    try:
+        spec = fetch_openapi()
+    except SystemExit:
+        spec = None
+
+    def resolve(candidate_ids: tuple[str, ...], keywords: tuple[str, ...], default_path: str) -> str:
+        if spec is not None:
+            hit = resolve_operation(spec, candidate_ids, keywords=keywords)
+            if hit:
+                return hit[1]
+        return default_path
+
+    def section(name: str, path: str, *, limit_names: int = 15) -> None:
         try:
-            payload = request_json(method, path, headers=headers)
+            payload = request_json("GET", path, headers=headers)
         except SystemExit as exc:
             result["errors"][name] = str(exc)
             return
@@ -1562,12 +1609,11 @@ def command_preflight(_: argparse.Namespace) -> None:
         else:
             result["sections"][name] = {"total": _payload_total(payload, items), "names": []}
 
-    def connections_section() -> None:
-        # Data connections live under /v1/connections/data. Attached datasets are the
-        # analyzable unit, so count them via each connection's datasets sub-resource
-        # (the list payload does not carry a reliable inline count).
+    def connections_section(list_path: str) -> None:
+        # Attached datasets are the analyzable unit, so count them via each connection's
+        # datasets sub-resource (the list payload has no reliable inline count).
         try:
-            payload = request_json("GET", "/v1/connections/data", headers=headers)
+            payload = request_json("GET", list_path, headers=headers)
         except SystemExit as exc:
             result["errors"]["connections"] = str(exc)
             return
@@ -1582,7 +1628,7 @@ def command_preflight(_: argparse.Namespace) -> None:
                 count = 0
                 if cid:
                     try:
-                        ds = request_json("GET", f"/v1/connections/data/{cid}/datasets", headers=headers)
+                        ds = request_json("GET", f"{list_path.rstrip('/')}/{cid}/datasets", headers=headers)
                         count = len(_extract_items(ds))
                     except SystemExit:
                         count = 0
@@ -1593,12 +1639,12 @@ def command_preflight(_: argparse.Namespace) -> None:
             "datasets_total": datasets_total,
         }
 
-    section("identity", "GET", "/v1/me")
-    section("org", "GET", "/v1/tenant/org")
-    section("projects", "GET", "/v1/projects")
-    section("tables", "GET", "/v1/tables")
-    section("views", "GET", "/v1/views")
-    connections_section()
+    section("identity", resolve(("get_current_member", "whoami", "get_me"), (), "/v1/me"))
+    section("org", resolve(("get_org", "get_tenant_org"), (), "/v1/tenant/org"))
+    section("projects", resolve(("list_projects",), ("project",), "/v1/projects"))
+    section("tables", resolve(("list_tables",), ("table",), "/v1/tables"))
+    section("views", resolve(("list_views",), ("view",), "/v1/views"))
+    connections_section(resolve(("list_data_connections",), ("connection", "data"), "/v1/connections/data"))
     print(json_dumps(result))
 
 

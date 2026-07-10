@@ -6,15 +6,16 @@ Fetch the live API contract from:
 {SUM_API_BASE_URL}/openapi.json
 ```
 
-The contract should drive route selection. Prefer `operationId`, tags, summaries, parameter schemas, and response schemas over route-name guessing.
+The contract should drive route selection. Prefer `operationId`, tags, summaries, parameter schemas, and response schemas over route-name guessing. **Literal `/v1/...` paths shown anywhere in these skills are illustrative and may move — resolve the live route from the contract; never depend on a hardcoded path.** If a documented path returns `404`, rediscover by operationId rather than assuming the resource is gone.
 
 ## Discovery Pattern
 
 1. Fetch OpenAPI.
 2. Search by product noun, for example `projects`, `tables`, `views`, `reports`, `query`, `chats`, `files`.
-3. Read the operation schema before calling.
-4. Supply only documented parameters and request body fields.
-5. Preserve pagination and streaming semantics from the contract.
+3. Call by `operationId` (`operation <operationId>`), which resolves the current path from the live spec — do not paste the literal path from a skill.
+4. Read the operation schema before calling.
+5. Supply only documented parameters and request body fields.
+6. Preserve pagination and streaming semantics from the contract.
 
 ## Error Handling
 

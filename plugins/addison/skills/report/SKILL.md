@@ -8,7 +8,7 @@ argument-hint: <question> [--project <name|id>] [--format markdown|pdf|docx]
 
 Run the full pipeline: resolve project → generate report → export artifact.
 
-**MCP-first**: when the `summation` MCP server is connected, use its report tools (e.g. `start_report`, report content/export) instead of the REST calls below. Report generation returns one buffered result (~15-60s, sometimes longer) — tell the user Addison is working and do not treat silence as failure before ~120s. Helper fallback: `../api/scripts/sum_api.py` (sibling `api` skill).
+**MCP-first**: when the `summation` MCP server is connected, use its report tools (e.g. `start_report`, report content/export) instead of the REST calls below. Report generation returns one buffered result (~15-60s, sometimes longer) — tell the user Addison is working and do not treat silence as failure before ~120s. Helper fallback: `../api/scripts/sum_api.py` (sibling `api` skill). The `/v1/...` paths below are illustrative — if a call returns 404, the route moved: rediscover via `operations`/`operation` (the contract is the source of truth).
 
 ## Flow
 

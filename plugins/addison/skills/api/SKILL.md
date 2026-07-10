@@ -20,6 +20,15 @@ Use Summation through the public `sum-api`. Do not call internal services direct
 
 There is a single environment: production (`https://api.summation.com`). The helper pins every request to it — do not ask the user to choose an environment.
 
+### Discovery-first — the contract is the source of truth, never a hardcoded path
+
+The OpenAPI document is authoritative; routes move and get renamed. **Any literal `/v1/...` path written in these skills is illustrative, not a promise.** Resolve the live route instead:
+
+- **Prefer MCP tools** — they are generated from the live contract at server boot, so they are always current.
+- **Otherwise resolve by operation, not path:** `operations <noun>` to find the operation, then `operation <operationId>` to call it (the helper reads the current path from the live spec). This survives a path move.
+- **If a documented path returns `404`, do not trust it — rediscover** with `operations <noun>` and call by operationId. A 404 on a listed endpoint means the route moved, not that the resource is missing.
+- The bundled `preflight` already resolves its routes this way (operationId, then keyword fallback, then a last-resort default), so it self-heals when the API shifts.
+
 ## Helper
 
 Prefer the bundled helper for deterministic discovery and calls. Resolve it from this skill's base directory (shown at the top of this skill when loaded).

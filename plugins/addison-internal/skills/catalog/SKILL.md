@@ -8,7 +8,7 @@ argument-hint: "[search term]"
 
 Discover what data exists before touching it.
 
-**MCP-first**: when the `summation` MCP server is connected, use its source-discovery and table/view tools (search, describe, previews, lineage) instead of the REST calls below. Caveat: `get_view`/`preview_view_data` can 404 on ids from `search_views` (known bug) — fall back to the tables path. Helper fallback: `../api/scripts/sum_api.py`.
+**MCP-first**: when the `summation` MCP server is connected, use its source-discovery and table/view tools (search, describe, previews, lineage) instead of the REST calls below. Caveat: `get_view`/`preview_view_data` can 404 on ids from `search_views` (known bug) — fall back to the tables path. Helper fallback: `../api/scripts/sum_api.py`. The `/v1/...` paths below are illustrative — if a call returns 404, the route moved: rediscover via `operations`/`operation` (the contract is the source of truth).
 
 ## Flow
 
