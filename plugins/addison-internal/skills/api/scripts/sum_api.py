@@ -1629,7 +1629,9 @@ def command_preflight(_: argparse.Namespace) -> None:
                 if cid:
                     try:
                         ds = request_json("GET", f"{list_path.rstrip('/')}/{cid}/datasets", headers=headers)
-                        count = len(_extract_items(ds))
+                        # Respect a pagination `total` when present; len() alone would
+                        # undercount a paged response and could wrongly keep Gate 2b blocked.
+                        count = _payload_total(ds, _extract_items(ds))
                     except SystemExit:
                         count = 0
             datasets_total += count
