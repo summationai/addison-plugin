@@ -8,7 +8,7 @@
       "name": "addison",
       "source": {
         "source": "local",
-        "path": "./plugins/codex"
+        "path": "./plugins/addison-codex"
       },
       "policy": {
         "installation": "AVAILABLE",

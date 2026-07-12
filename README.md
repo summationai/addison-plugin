@@ -73,7 +73,7 @@ user approval before publishing anywhere.
 `plugins/addison` (external, source of truth) ships to the public marketplace: production-pinned, device-login only, host-pinned HTTPS requests. Two editions are **generated** from it — never edit them directly:
 
 - `plugins/addison-internal` — `./build-editions.sh` bakes `EDITION="internal"` (any environment, M2M, profiles) plus the overlays in `internal/overlay/`.
-- `plugins/codex` — `./build-codex.sh` rewrites `/addison:` → `$addison-`, swaps in a `signin`/`signout` overlay that registers the MCP server in `~/.codex/config.toml` (`mcp-connect --client codex`), and writes `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json`.
+- `plugins/addison-codex` — `./build-codex.sh` rewrites `/addison:` → `$addison-`, swaps in a `signin`/`signout` overlay that registers the MCP server in `~/.codex/config.toml` (`mcp-connect --client codex`), and writes `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json`.
 
 The `Check generated editions` CI regenerates both and **fails the build if they drift from source** — so there is exactly one place to edit (`plugins/addison`), and the generated dirs can never fall out of sync. The edition is a build-time constant, not an env var, so the external artifact contains no unlock path.
 
@@ -83,7 +83,7 @@ The `Check generated editions` CI regenerates both and **fails the build if they
 claude --plugin-dir ./plugins/addison        # load external for one session
 claude plugin validate ./plugins/addison     # validate manifest
 ./build-editions.sh                          # regenerate plugins/addison-internal
-./build-codex.sh                             # regenerate plugins/codex + Codex marketplace
+./build-codex.sh                             # regenerate plugins/addison-codex + Codex marketplace
 ./build-zip.sh                               # rebuild dist/addison-plugin.zip for org upload
 ```
 

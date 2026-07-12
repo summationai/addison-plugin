@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Assemble plugins/codex from plugins/addison (the source of truth).
-# plugins/codex is GENERATED — edit plugins/addison or this builder, never plugins/codex.
+# Assemble plugins/addison-codex from plugins/addison (the source of truth).
+# plugins/addison-codex is GENERATED — edit plugins/addison or this builder, never plugins/addison-codex.
 # Codex differs from the Claude edition only by: $addison- mention syntax, a signin/signout
 # auth overlay (device-login + `mcp-connect --client codex`), and the Codex manifest.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 SRC=plugins/addison
-DST=plugins/codex
+DST=plugins/addison-codex
 MARKETPLACE=.agents/plugins/marketplace.json
 
 if find "$SRC" -name ".summation-config*" | grep -q .; then
@@ -205,7 +205,7 @@ write_json(dst / ".codex-plugin" / "plugin.json", plugin_json)
 
 entry = {
     "name": "addison",
-    "source": {"source": "local", "path": "./plugins/codex"},
+    "source": {"source": "local", "path": "./plugins/addison-codex"},
     "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"},
     "category": "Data",
 }
