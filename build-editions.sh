@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Assemble plugins/addison-internal from the external source of truth (plugins/addison):
+# Assemble plugins/addison-claude-internal from the external source of truth (plugins/addison-claude):
 #   1. copy the external plugin
 #   2. bake EDITION="internal" into sum_api.py (build-time constant — no runtime unlock)
 #   3. apply internal skill overlays from internal/overlay/
 #   4. namespace slash-commands (/addison: -> /addison-internal:)
 #   5. write the internal plugin.json (version synced from external)
-# plugins/addison-internal is GENERATED — never edit it directly.
+# plugins/addison-claude-internal is GENERATED — never edit it directly.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SRC=plugins/addison
-DST=plugins/addison-internal
+SRC=plugins/addison-claude
+DST=plugins/addison-claude-internal
 
 if find "$SRC" -name ".summation-config*" | grep -q .; then
   echo "refusing to build: credential file inside $SRC" >&2

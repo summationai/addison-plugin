@@ -70,26 +70,26 @@ user approval before publishing anywhere.
 
 ## Editions
 
-`plugins/addison` (external, source of truth) ships to the public marketplace: production-pinned, device-login only, host-pinned HTTPS requests. Two editions are **generated** from it — never edit them directly:
+`plugins/addison-claude` (external, source of truth) ships to the public marketplace: production-pinned, device-login only, host-pinned HTTPS requests. Two editions are **generated** from it — never edit them directly:
 
-- `plugins/addison-internal` — `./build-editions.sh` bakes `EDITION="internal"` (any environment, M2M, profiles) plus the overlays in `internal/overlay/`.
+- `plugins/addison-claude-internal` — `./build-editions.sh` bakes `EDITION="internal"` (any environment, M2M, profiles) plus the overlays in `internal/overlay/`.
 - `plugins/addison-codex` — `./build-codex.sh` rewrites `/addison:` → `$addison-`, swaps in a `signin`/`signout` overlay that registers the MCP server in `~/.codex/config.toml` (`mcp-connect --client codex`), and writes `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json`.
 
-The `Check generated editions` CI regenerates both and **fails the build if they drift from source** — so there is exactly one place to edit (`plugins/addison`), and the generated dirs can never fall out of sync. The edition is a build-time constant, not an env var, so the external artifact contains no unlock path.
+The `Check generated editions` CI regenerates both and **fails the build if they drift from source** — so there is exactly one place to edit (`plugins/addison-claude`), and the generated dirs can never fall out of sync. The edition is a build-time constant, not an env var, so the external artifact contains no unlock path.
 
 ## Dev loop
 
 ```bash
-claude --plugin-dir ./plugins/addison        # load external for one session
-claude plugin validate ./plugins/addison     # validate manifest
-./build-editions.sh                          # regenerate plugins/addison-internal
+claude --plugin-dir ./plugins/addison-claude        # load external for one session
+claude plugin validate ./plugins/addison-claude     # validate manifest
+./build-editions.sh                          # regenerate plugins/addison-claude-internal
 ./build-codex.sh                             # regenerate plugins/addison-codex + Codex marketplace
 ./build-zip.sh                               # rebuild dist/addison-plugin.zip for org upload
 ```
 
 ## Release
 
-1. Bump `version` in `plugins/addison/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and `.claude-plugin/marketplace.internal.json` (marketplace users only receive updates on a version bump).
+1. Bump `version` in `plugins/addison-claude/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and `.claude-plugin/marketplace.internal.json` (marketplace users only receive updates on a version bump).
 2. Run `./build-editions.sh` and `./build-codex.sh` to regenerate the internal and Codex editions, and commit (the drift-guard CI enforces this). Merge to `main`.
 3. Tag the release and push the tag:
    ```bash

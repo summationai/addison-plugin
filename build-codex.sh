@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Assemble plugins/addison-codex from plugins/addison (the source of truth).
-# plugins/addison-codex is GENERATED — edit plugins/addison or this builder, never plugins/addison-codex.
+# Assemble plugins/addison-codex from plugins/addison-claude (the source of truth).
+# plugins/addison-codex is GENERATED — edit plugins/addison-claude or this builder, never plugins/addison-codex.
 # Codex differs from the Claude edition only by: $addison- mention syntax, a signin/signout
 # auth overlay (device-login + `mcp-connect --client codex`), and the Codex manifest.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SRC=plugins/addison
+SRC=plugins/addison-claude
 DST=plugins/addison-codex
 MARKETPLACE=.agents/plugins/marketplace.json
 
